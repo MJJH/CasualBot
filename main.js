@@ -2,7 +2,7 @@
 const 
 	Discord = require("discord.js"),
 	Scheduler = require('node-cron'),
-        options = require('options'),
+        options = require('./options.js'),
 	lowdb = require('lowdb'),
 	fs = require('lowdb/adapters/FileSync'),
 	update = .5 * 60 * 1000,
