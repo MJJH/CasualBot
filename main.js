@@ -155,13 +155,13 @@ client.on('message', (message) => {
 			}), {split: true, code: true});
 		} else if(content[0] === '?settings') {
 			if (message.author.id === super_admin && content.length > 1) {
-				try {
+				// try {
 					admin_actions[content[1]](content[2]);
-				} catch (e) {
+				/*} catch (e) {
 					console.log(e.message);
 					var bal = server.emojis.filter((e) => e.name.toLowerCase() === 'bal').first();
 					message.react(bal);
-				}
+				}*/
 			}
 			
 			var out = server.channels.filter((c) => c.id === output_channel).first().name,
