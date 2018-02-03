@@ -277,7 +277,7 @@ createSession = function () {
 	var sessions = db.get('session').push({ id: (session + 1), date: new Date().getTime() }).last().write().id;
 	session = sessions;
 },
-reset_week = funcion () {
+reset_week = function () {
 	// Output
 	var f = (array) => {
 				var na = [];
