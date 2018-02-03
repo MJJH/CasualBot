@@ -281,14 +281,15 @@ createSession = function () {
 reset_week = function () {
 	// Output
 	var f = (array) => {
-				var na = [];
-				array.forEach((v, i, c) => {
-					var user = server.members.filter((z) => z.id === v.user_id).first();	
-					if (user.roles.map((x) => x.name.toLowerCase()).indexOf('Autist'.toLowerCase()) >= 0)
-						na.push(v);
-				});
-				return na;
-			};
+		var na = [];
+		array.forEach((v, i, c) => {
+			var user = server.members.filter((z) => z.id === v.user_id).first();	
+			if (user && user.roles.map((x) => x.name.toLowerCase()).indexOf('Autist'.toLowerCase()) >= 0)
+				na.push(v);
+		});
+		console.log("Scores found for "+na+" users");
+		return na;
+	};
 	
 	server.channels.find((v) => v.id === output_channel).send(getOutput(f), {split: true, code: true}).then(message => message.pin());
 	var order = db.get('point_system').filter({ 'session': session })._has(f).sum_points().sort(sort_list).take(autilords + aulites).value().map(v => v.user);
