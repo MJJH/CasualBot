@@ -158,6 +158,7 @@ client.on('message', (message) => {
 				try {
 					admin_actions[content[1]](content[2]);
 				} catch (e) {
+					console.log(e.message);
 					var bal = server.emojis.filter((e) => e.name.toLowerCase() === 'bal').first();
 					message.react(bal);
 				}
