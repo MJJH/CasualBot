@@ -47,7 +47,7 @@ const
 		party: (t) => { points.party_bonus = parseFloat(t); },
 		aulite: (t) => { aulites = parseInt(t); },
 		autilord: (t) => { autilords = parseInt(t); },
-		restart: (c) => { if (c === 'MartijnIsCool') createSession(); },
+		restart: (c) => { if (c === 'MartijnIsCool') reset_week(); },
 		hardcore: (t) => { var split = t.split("-"); hardcore.start = parseInt(split[0]); hardcore.end = parseInt(split[1]); },
 		output: (t) => { output_channel = t },
 		input: (t) => { input_channel.indexOf(t) >= 0 ? input_channel.splice(input_channel.indexOf(t), 1) : input_channel.push(t); }
@@ -198,38 +198,7 @@ client.setInterval( function (args) {
 }, update, {});
 
 var sched = Scheduler.schedule([output.second, output.minute, output.hour, '*', '*', output.day].join(" "), () => {
-	// Output
-	var f = (array) => {
-				var na = [];
-				array.forEach((v, i, c) => {
-					var user = server.members.filter((z) => z.id === v.user_id).first();	
-					if (user.roles.map((x) => x.name.toLowerCase()).indexOf('Autist'.toLowerCase()) >= 0)
-						na.push(v);
-				});
-				return na;
-			};
-	
-	server.channels.find((v) => v.id === output_channel).send(getOutput(f), {split: true, code: true}).then(message => message.pin());
-	var order = db.get('point_system').filter({ 'session': session })._has(f).sum_points().sort(sort_list).take(autilords + aulites).value().map(v => v.user);
-	
-	// Reset
-	createSession();
-	
-	// Update roles
-	var autilord = server.roles.filter((v) => v.name.toLowerCase() === 'AutiLord'.toLowerCase()).first(),
-		aulite = server.roles.filter((v) => v.name.toLowerCase() === 'Aulite'.toLowerCase()).first();
-		
-	server.members.filter(v => v.roles.map(x => x.name.toLowerCase()).indexOf('Autilord'.toLowerCase()) >= 0 && order.slice(0, autilords).indexOf(v.id) < 0).forEach(v => {v.removeRole(autilord)});
-	server.members.filter(v => v.roles.map(x => x.name.toLowerCase()).indexOf('Aulite'.toLowerCase()) >= 0 && order.indexOf(v.id) < 0).forEach(v => {v.removeRole(aulite)});
-	
-	for (var i = 0; i < order.length; i++) {
-		var user = server.members.filter(u => u.id === order[i]).first();
-		
-		if (i < autilords) {
-			user.addRole(autilord);
-		}
-		user.addRole(aulite);
-	}
+	reset_week();
 });
 client.on('disconnect', () => {
 	sched.destroy();
@@ -307,6 +276,40 @@ getSession = function () {
 createSession = function () {
 	var sessions = db.get('session').push({ id: (session + 1), date: new Date().getTime() }).last().write().id;
 	session = sessions;
+},
+reset_week = funcion () {
+	// Output
+	var f = (array) => {
+				var na = [];
+				array.forEach((v, i, c) => {
+					var user = server.members.filter((z) => z.id === v.user_id).first();	
+					if (user.roles.map((x) => x.name.toLowerCase()).indexOf('Autist'.toLowerCase()) >= 0)
+						na.push(v);
+				});
+				return na;
+			};
+	
+	server.channels.find((v) => v.id === output_channel).send(getOutput(f), {split: true, code: true}).then(message => message.pin());
+	var order = db.get('point_system').filter({ 'session': session })._has(f).sum_points().sort(sort_list).take(autilords + aulites).value().map(v => v.user);
+	
+	// Reset
+	createSession();
+	
+	// Update roles
+	var autilord = server.roles.filter((v) => v.name.toLowerCase() === 'AutiLord'.toLowerCase()).first(),
+		aulite = server.roles.filter((v) => v.name.toLowerCase() === 'Aulite'.toLowerCase()).first();
+		
+	server.members.filter(v => v.roles.map(x => x.name.toLowerCase()).indexOf('Autilord'.toLowerCase()) >= 0 && order.slice(0, autilords).indexOf(v.id) < 0).forEach(v => {v.removeRole(autilord)});
+	server.members.filter(v => v.roles.map(x => x.name.toLowerCase()).indexOf('Aulite'.toLowerCase()) >= 0 && order.indexOf(v.id) < 0).forEach(v => {v.removeRole(aulite)});
+	
+	for (var i = 0; i < order.length; i++) {
+		var user = server.members.filter(u => u.id === order[i]).first();
+		
+		if (i < autilords) {
+			user.addRole(autilord);
+		}
+		user.addRole(aulite);
+	}
 },
 fz = function (i) {
 	if (!i)
