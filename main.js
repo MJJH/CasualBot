@@ -19,6 +19,7 @@ const
 		minute: 0,
 		hour: 0
 	},
+        days = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag'],
 	client = new Discord.Client({ 
 		sync: true,
 		/* messageSweepInterval: update / 1000,*/ 
@@ -27,13 +28,30 @@ const
 	}),
 	top = 20,
 	input_channel = [ '195633561439698945', '317406295202332672' ],
-	output_channel = '182396856070832128',
+	output_channel = '317406295202332672',
 	server_id = '95891329841627136',
+        super_admin = '95891032310296576',
 	
 	db_path = 'db.json',
 	adapter = new fs(db_path),
 	db = lowdb(adapter),
-	hardcore = {start: 0, end: 7};
+	hardcore = {start: 0, end: 7},
+        autilords = 1,
+	aulites = 3,
+	admin_actions = {
+		top: (t) => { top = parseInt(t); },
+		chat: (t) => { points.chat = parseFloat(t); },
+		voice: (t) => { points.voice = parseFloat(t); },
+		online: (t) => {points.online = parseFloat(t); },
+		night: (t) => { points.night_bonus = parseFloat(t); },
+		party: (t) => { points.party_bonus = parseFloat(t); },
+		aulite: (t) => { aulites = parseInt(t); },
+		autilord: (t) => { autilords = parseInt(t); },
+		restart: (c) => { if (c === 'MartijnIsCool') createSession(); },
+		hardcore: (t) => { var split = t.split("-"); hardcore.start = parseInt(split[0]); hardcore.end = parseInt(split[1]); },
+		output: (t) => { output_channel = t },
+		input: (t) => { input_channel.indexOf(t) >= 0 ? input_channel.splice(input_channel.indexOf(t), 1) : input_channel.push(t); }
+	};
 	
 
 // Variables
@@ -82,7 +100,7 @@ db._.mixin({
 	_has: (array, ffilter) => ffilter(array)
 });
 
-db.defaults({ point_system: [ ], session: [ ] }).write();
+db.defaults({ point_system: [ ], session: [ ], options: { } }).write();
 
 	
 // Discord	
@@ -136,11 +154,27 @@ client.on('message', (message) => {
 				return na;
 			}), {split: true, code: true});
 		} else if(content[0] === '?settings') {
+			if (message.author.id === super_admin && content.length > 1) {
+				try {
+					admin_actions[content[1]](content[2]);
+				} catch (e) {
+					var bal = server.emojis.filter((e) => e.name.toLowerCase() === 'bal').first();
+					message.react(bal);
+				}
+			}
+			
+			var out = server.channels.filter((c) => c.id === output_channel).first().name,
+				inp = server.channels.filter((c) => input_channel.indexOf(c.id) >= 0).map((x) => "#" + x.name);
+			
 			message.channel.send(
 			['Update-timer: ' + (update / 1000) + ' seconden', 
+			'Uitreiking: Elke '+days[output.day]+' om '+ [fz(output.hour), fz(output.minute), fz(output.seconds)].join(":") + ' in #' + out,
+			'Input mogelijk in: [' + inp.join(", ") + ']',
 			'Punten: online ('+points.online+'), chat ('+points.chat+'), voice ('+points.voice+')', 
 			'Midnight multiplier ['+hardcore.start+'-'+hardcore.end+' uur] (*'+ points.night_bonus +')',
-			'Party bonus ('+points.party_bonus+' ^ connecties)'].join("\n"), {split: true, code: true});
+			'Party bonus ('+points.party_bonus+' ^ connecties)',
+			'Aantal rollen: AutiLords ('+autilords+'), Aulite ('+aulites+')',
+			'Top lijst ('+top+')'].join("\n"), {split: true, code: true});
 		}
 	}
 });
@@ -158,31 +192,44 @@ client.setInterval( function (args) {
 	// Check voice
 	server.members.filter((v) => v.voiceChannel !== undefined && !v.selfMute && !v.serverMute && v.presence.status === 'online' && !v.user.bot).forEach((v, k, m) => {
 		var found = v.voiceChannel.members.filter((m) => !m.user.bot && !m.selfMute && !m.serverMute && v.presence.status === 'online').array().length;
-		givePoints(k, 'voice', Math.pow(points.party_bonus, found - 1));
+		if (found > 0)
+			givePoints(k, 'voice', Math.pow(points.party_bonus, found - 1));
 	});
 }, update, {});
 
 var sched = Scheduler.schedule([output.second, output.minute, output.hour, '*', '*', output.day].join(" "), () => {
 	// Output
-	server.channels.find((v) => v.id === output_channel).send(
-		getOutput((array) => {
-			var na = [];
-			
-			array.forEach((v, i, c) => {
-				var user = server.members.filter((v) => v.id == v.user_id);
-				
-				if (user.roles.map((x) => x.name).array().indexOf('Autist')) {
-					na.push(v);
-				}
+	var f = (array) => {
+				var na = [];
+				array.forEach((v, i, c) => {
+					var user = server.members.filter((z) => z.id === v.user_id).first();	
+					if (user.roles.map((x) => x.name.toLowerCase()).indexOf('Autist'.toLowerCase()) >= 0)
+						na.push(v);
+				});
 				return na;
-			});
-		}), {split: true, code: true}).then(message => message.pin());
+			};
+	
+	server.channels.find((v) => v.id === output_channel).send(getOutput(f), {split: true, code: true}).then(message => message.pin());
+	var order = db.get('point_system').filter({ 'session': session })._has(f).sum_points().sort(sort_list).take(autilords + aulites).value().map(v => v.user);
 	
 	// Reset
 	createSession();
 	
 	// Update roles
+	var autilord = server.roles.filter((v) => v.name.toLowerCase() === 'AutiLord'.toLowerCase()).first(),
+		aulite = server.roles.filter((v) => v.name.toLowerCase() === 'Aulite'.toLowerCase()).first();
+		
+	server.members.filter(v => v.roles.map(x => x.name.toLowerCase()).indexOf('Autilord'.toLowerCase()) >= 0 && order.slice(0, autilords).indexOf(v.id) < 0).forEach(v => {v.removeRole(autilord)});
+	server.members.filter(v => v.roles.map(x => x.name.toLowerCase()).indexOf('Aulite'.toLowerCase()) >= 0 && order.indexOf(v.id) < 0).forEach(v => {v.removeRole(aulite)});
 	
+	for (var i = 0; i < order.length; i++) {
+		var user = server.members.filter(u => u.id === order[i]).first();
+		
+		if (i < autilords) {
+			user.addRole(autilord);
+		}
+		user.addRole(aulite);
+	}
 });
 client.on('disconnect', () => {
 	sched.destroy();
@@ -235,18 +282,10 @@ getOutput = function (filter) {
 	db.get('point_system').filter({ 'session': session })._has(filter).sum_points().sort(sort_list).take(top).value().forEach(function(val, i) {
 		var member = server.members.find((v) => v.id === val.user);
 		
-		//if (member.hasOwnProperty('user') && !member.user.bot)
-		//	sorted.push({ key: member.displayName, val: getPoints(k).points, role: member.highestRole.position });
 		list.push("# " + (i+1) + ". " + member.displayName + " {" + Math.round(val.points) + "}");
 	});
-	//sorted.sort(sort_list);
-	
-	//for (var i = 1; i <= Math.min(top, sorted.length); i++) {
-	//	list.push("# " + i + ". " + sorted[i-1].key + " {" + Math.round(sorted[i-1].val) + "}");
-	//}
-	
 	list.push("# ------");
-	return list.join("\n"); b
+	return list.join("\n");
 },
 getRanking = function (user_id) {
 	var list = db.get('point_system').filter({ 'session': session }).sum_points().sort(sort_list).value();
@@ -268,4 +307,11 @@ getSession = function () {
 createSession = function () {
 	var sessions = db.get('session').push({ id: (session + 1), date: new Date().getTime() }).last().write().id;
 	session = sessions;
+},
+fz = function (i) {
+	if (!i)
+		return "00";
+	if(i < 10)
+		return "0" + i;
+	return "" + i;
 };
